@@ -1,0 +1,330 @@
+---
+title: "Chapter 03 Sampling the imaginary"
+author: "Adam Gruer"
+date: "22/05/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## What I remember
+
+
+
+
+## Notes
+
+
+## Questions
+
+```{r}
+
+p_grid <- seq( from=0 , to=1 , length.out=1000 )
+prob_p <- rep( 1 , 1000 )
+prob_data <- dbinom( 6 , size=9 , prob=p_grid )
+posterior <- prob_data * prob_p
+posterior <- posterior / sum(posterior)
+
+samples <- sample( p_grid , prob=posterior , size=1e4 , replace=TRUE )
+plot(samples)
+
+library(rethinking)
+dens( samples )
+
+# posterior probability prop water below 0.5
+sum(posterior[p_grid < 0.5])
+
+sum(samples < 0.5) / 1e4
+sum(samples > 0.5 & samples < 0.75) / 1e4
+
+# compatibility interval
+quantile(samples, 0.8)
+
+quantile(samples, c(0.1, 0.9))
+
+# observed w, w, w
+p_grid <- seq( from=0 , to=1 , length.out=1000 )
+prior <- rep(1,1000)
+likelihood <- dbinom( 3 , size=3 , prob=p_grid )
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+samples <- sample( p_grid , size=1e4 , replace=TRUE , prob=posterior )
+dens(samples)
+
+PI(samples,prob =  0.5)
+HPDI(samples, prob = 0.5)
+p_grid[which.max(posterior)]
+
+chainmode(samples, adj = 0.01)
+
+mean(samples)
+median(samples)
+```
+## Simulaiton
+
+```{r}
+dbinom(0:2, size = 2, prob = 0.7)
+
+rbinom(1, size = 2, prob = 0.7)
+
+rbinom(10, size = 2, prob = 0.7)
+
+dummy_w <- rbinom(1e5, size = 2, prob = 0.7)
+table(dummy_w) /1e5
+
+dummy_w <- rbinom( 1e5 , size=9 , prob=0.7 )
+table(dummy_w) /1e5
+simplehist( dummy_w , xlab="dummy water count" )
+```
+
+```{r}
+p_grid <- seq( from=0 , to=1 , length.out=1000 )
+prob_p <- rep( 1 , 1000 )
+prob_data <- dbinom( 6 , size=9 , prob=p_grid )
+posterior <- prob_data * prob_p
+posterior <- posterior / sum(posterior)
+
+samples <- sample( p_grid , prob=posterior , size=1e4 , replace=TRUE )
+
+w <- rbinom(1e4, size = 9, prob = 0.6)
+simplehist(w)
+w <- rbinom(1e4, size = 9, prob = samples)
+simplehist(w)
+```
+
+## practice
+
+```{r}
+p_grid <- seq( from=0 , to=1 , length.out=1000 )
+prior <- rep( 1 , 1000 )
+likelihood <- dbinom( 6 , size=9 , prob=p_grid )
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+set.seed(100)
+samples <- sample( p_grid , prob=posterior , size=1e4 , replace=TRUE )
+dens(samples)
+```
+## 3E1
+
+```{r}
+sum(samples < 0.2) / 1e4
+```
+## 3E2
+
+```{r}
+sum(samples > 0.8) / 1e4
+```
+## 3E3
+
+```{r}
+sum(samples > 0.2 & samples < 0.8) / 1e4
+```
+## 3E4
+
+```{r}
+quantile(samples , 0.2)
+```
+
+## 3E5
+
+```{r}
+quantile(samples, 0.8)
+```
+
+## 3E6
+
+```{r}
+rethinking::HPDI(samples, prob = 0.66)
+
+```
+
+## 3E7
+
+```{r}
+PI(samples, prob = 0.66)
+quantile(samples, c(0.17, 0.83))
+```
+
+## 3M1
+
+Suppose the globe tossing data had turned out to be 8 water in 15 tosses. Construct the posterior distribution, using grid approximation. Use the same flat prior as before.
+
+```{r}
+p_grid <- seq( from=0 , to=1 , length.out=1000 )
+prior <- rep( 1 , 1000 )
+likelihood <- dbinom( 8 , size=15 , prob=p_grid )
+posterior <- likelihood * prior
+posterior <- posterior / sum(posterior)
+
+```
+
+## 3M2
+
+Draw 10,000 samples from the grid approximation from above. Then use the samples to calculate the 90% HPDI for p
+
+```{r}
+set.seed(100)
+samples <- sample(p_grid, 1e4, replace = TRUE, prob = posterior)
+HPDI(samples, 0.9)
+```
+
+## 3M3
+
+Construct a posterior predictive check for this model and data. This means simulate the distribution of samples, averaging over the posterior uncertainty in p. What is the probability of observing
+8 water in 15 tosses?
+
+```{r}
+set.seed(100)
+w <- rbinom(1e4, size = 15, prob = samples)
+mean(w == 8)
+simplehist(w)
+```
+
+## 3M4
+
+Using the posterior distribution constructed from the new (8/15) data, now calculate the probability of observing 6 water in 9 tosses.
+
+```{r}
+set.seed(100)
+w <- rbinom(1e4, size = 9, prob = samples)
+simplehist(w)
+mean(w == 6)
+```
+
+## 3M5.
+
+Start over at 3M1, but now use a prior that is zero below p = 0.5 and a constant above p = 0.5.
+This corresponds to prior information that a majority of the Earth’s surface is water. Repeat each
+problem above and compare the inferences. What difference does the better prior make? If it helps,
+compare inferences (using both priors) to the true value p = 0.7.
+```{r}
+
+prior2 <- ifelse(p_grid < 0.5, 0, 1)
+likelihood <- dbinom( 8 , size=15 , prob=p_grid )
+posterior2 <- likelihood * prior2
+posterior2 <- posterior2 / sum(posterior2)
+
+set.seed(100)
+samples2 <- sample(p_grid, 1e4,  replace = TRUE, prob = posterior2)
+dens(samples2)
+
+HPDI(samples2, 0.9)
+
+set.seed(100)
+w2 <- rbinom(1e4, size = 15, prob = samples2)
+mean(w2 == 8)
+simplehist(w2)
+
+set.seed(100)
+w2 <- rbinom(1e4, size = 9, prob = samples2)
+simplehist(w2)
+mean(w2 == 6)
+
+```
+
+Introduction. The practice problems here all use the data below. These data indicate the gender
+(male=1, female=0) of officially reported first and second born children in 100 two-child families.
+
+```{r}
+library(rethinking)
+data(homeworkch3)
+```
+
+Use these vectors as data. So for example to compute the total number of boys born across all of these
+births, you could use:
+
+```{r}
+sum(birth1 + birth2)
+```
+
+## 3H1. 
+
+Using grid approximation, compute the posterior distribution for the probability of a birth
+being a boy. Assume a uniform prior probability. Which parameter value maximizes the posterior
+probability?
+
+```{r}
+p_grid = seq(from = 0, to = 1, length.out = 1000)
+prior <- rep(0.5, 1000)
+set.seed(100)
+likelihood <- dbinom(111, size = 200, prob = p_grid )
+
+posterior <- prior * likelihood 
+posterior <- posterior / sum(posterior)
+
+plot(p_grid, posterior)
+p_grid[which.max(posterior)]
+```
+
+## 3H2
+
+Using the sample function, draw 10,000 random parameter values from the posterior distribution you calculated above. Use these samples to estimate the 50%, 89%, and 97% highest posterior
+density intervals.
+
+```{r}
+set.seed(100)
+samples <- sample(p_grid, size = 1e4, replace = TRUE,  prob = posterior )
+
+HPDI(samples, prob = 0.5)
+HPDI(samples, prob = 0.89)
+HPDI(samples, prob = .97)
+```
+
+## 3H3.
+
+Use rbinom to simulate 10,000 replicates of 200 births. You should end up with 10,000 numbers, each one a count of boys out of 200 births. Compare the distribution of predicted numbers
+of boys to the actual count in the data (111 boys out of 200 births). There are many good ways to
+visualize the simulations, but the dens command (part of the rethinking package) is probably the
+easiest way in this case. Does it look like the model fits the data well? That is, does the distribution
+of predictions include the actual observation as a central, likely outcome?
+
+Yes
+
+```{r}
+set.seed(100)
+b <- rbinom(1e4, size = 200, prob = samples) 
+
+dens(b)
+```
+
+##3H4.
+
+Now compare 10,000 counts of boys from 100 simulated first borns only to the number of boys
+in the first births, birth1. How does the model look in this light?
+
+
+No the model tends to overestimate the number of first born boys. 
+
+```{r}
+set.seed(100)
+b100 <- rbinom(1e4, size = 100, prob = samples)
+dens(b100)
+library(ggplot2)
+ggplot(data = tibble::tibble(nboys = b100)) +
+  geom_density(aes(x = nboys), adjust = 0.5) +
+  geom_vline(xintercept  = sum(birth1))
+dens(b100)
+```
+
+## 3H5. 
+
+The model assumes that sex of first and second births are independent. To check this assumption, focus now on second births that followed female first borns. Compare 10,000 simulated counts
+of boys to only those second births that followed girls. To do this correctly, you need to count the
+number of first borns who were girls and simulate that many births, 10,000 times. Compare the
+counts of boys in your simulations to the actual observed count of boys following girls. How does the
+model look in this light? Any guesses what is going on in these data?
+
+The model significantly underestimates the number of second children who are boys following a first born girl.  Perhaps indicates that sex of first and second born children are not independant of each other.
+
+```{r}
+g1 <- 100 - sum(birth1)
+boys_after_girl<- rbinom(1e4, size = g1, prob = samples)
+
+ggplot(data = tibble::tibble(nboys = boys_after_girl)) +
+  geom_density(aes(x = nboys), adjust = 0.8) +
+  geom_vline(xintercept  = sum(birth2[birth1 == 0]))
+
+```
+
