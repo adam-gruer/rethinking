@@ -118,4 +118,196 @@ tibble(group = seq_len(n),
   labs(x = "Year", y = "Height")
 
 ```
+## 4M5
+
+Each child gets taller each year
+I don't understand log scales well enough 
+in my ansewer above I use rlnorm(0,1)
+in the  online solutions rlnorm(2, 0.5) is used . i dont understand why https://sr2-solutions.wjakethompson.com/linear-models.html#chapter-4
+
+```{r}
+samples_1 <- rlnorm(1e4, 0, 1)
+PI_1 <- PI(samples_1, prob = 0.89)
+PI_1
+dens(samples_1)
+
+samples_2 <- rlnorm(1e4, 2,0.5)
+PI_2 <- PI(samples_2, prob = 0.89)
+PI_2
+```
+Actually I prefer my choice of prior based on experience with my own children.
+Choice definitely depends on starting age of children
+
+
+## 4M6
+
+
+# Hard
+
+## 4H1
+
+Make predictions
+
+```{r}
+individuals <- c(46.95, 43.72, 64.78, 32.59, 54.63)
+
+data("Howell1")
+d <- Howell1
+d2 <- d[d$age >= 18, ]
+
+
+xbar <- mean(d2$weight)
+
+#fit omdel
+m4.3 <- quap(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * (weight - xbar),
+    a ~ dnorm(178, 20),
+    b ~ dlnorm(0, 1),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d2
+)
+
+post <- extract.samples(m4.3)
+mu <- link(m4.3, data = data.frame(weight = individuals))
+```
+
+```{r}
+mu.df <- `colnames<-`(mu, individuals) %>% 
+  as.data.frame() %>% 
+  pivot_longer(cols = everything(),
+               names_to = "weight",
+               values_to = "height",
+               names_transform = list(weight = as.numeric)) 
+
+ggplot(data = mu.df, aes(x = weight, y = height)) +
+  geom_point(alpha = 0.2 )
+ 
+```
+
+
+```{r}
+#summarise distribution of mu
+mu.df <- mu.df %>% 
+  group_by(weight) %>% 
+  summarise(expected_height = mean(height),
+            int = PI(height, prob = 0.89),
+            probs= c("5%", "94%"), 
+            .groups = "drop") %>%  
+  pivot_wider( id_cols = c(weight, expected_height), 
+               names_from = probs, values_from = int)
+
+```
+
+## 4H2
+
+```{r}
+d3 <- d[d$age < 18, ]
+
+xbar <- mean(d3$weight)
+
+
+youth <- quap(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * (weight - xbar),
+    a ~ dnorm(80, 40),
+    b ~ dlnorm(2, 0.5),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d3
+)
+
+precis(youth)
+```
+
+For every 10 units of increase in weight this model predicts a child gets 27cm taller
+
+```{r}
+
+post <- extract.samples(youth)
+
+a_map <- mean(post$a)
+b_map <- mean(post$b)
+
+
+weight.seq <- seq(from = 4, to = 45, by = 1)
+mu <- link(youth, data = data.frame(weight=weight.seq))
+
+mu.PI <- apply(mu, 2, PI, prob = 0.89)
+mu.PI.df <- PI.df(mu.PI, weight.seq)
+
+sim.height <- sim(youth, data = list(weight = weight.seq), n = 1e4)
+
+height.PI <- apply(sim.height, 2, PI , prob= 0.89)
+height.PI.df <- PI.df(height.PI, weight.seq)
+
+
+ggplot() +
+  
+  geom_function(fun = function(x) {a_map + b_map*(x - xbar)}) +
+  geom_ribbon(data = mu.PI.df, 
+              aes(x = x, ymin = x5_percent, ymax = x94_percent),
+              alpha = 0.2, colour = "grey90"  ) +
+   geom_ribbon(data = height.PI.df, 
+              aes(x = x, ymin = x5_percent, ymax = x94_percent),
+              alpha = 0.2, colour = "grey80"  ) +
+  geom_point(data = d3, aes(x = weight, y = height)) 
+  
+```
+Model doesnt do a great job of predicting hieght in infants or late teens.
+Maybe do a polynomial linear regression intead
+
+
+## 4H3
+
+```{r}
+m4h3 <- quap(
+  alist(
+    height ~ dnorm(mu, sigma),
+    mu <- a + b * log(weight),
+    a ~ dnorm(178, 20),
+    b ~ dlnorm(0, 1),
+    sigma ~ dunif(0, 50)
+  ),
+  data = d
+)
+
+precis(m4h3)
+```
+
+```{r}
+
+post <- extract.samples(m4h3)
+a_map <- mean(post$a)
+b_map <- mean(post$b)
+
+weight.seq <- seq(from = 4, to = 63, by = 1)
+mu <- link(m4h3, data = data.frame(weight=weight.seq))
+mu.PI <- apply(mu, 2, PI, prob = 0.97)
+mu.PI.df <- PI.df(mu.PI, weight.seq)
+
+sim.height <- sim(m4h3, data.frame(weight = weight.seq))
+height.PI <- apply(sim.height, 2, PI, prob = 0.97)
+height.PI.df <- PI.df(height.PI, weight.seq)
+
+ggplot() +
+     geom_ribbon(data = height.PI.df, 
+              aes(x = x, ymin = x2_percent, ymax = x98_percent),
+              alpha = 0.2, colour = "grey80"  ) +
+    geom_ribbon(data = mu.PI.df, 
+              aes(x = x, ymin = x2_percent, ymax = x98_percent),
+              alpha = 0.2, colour = "grey90"  ) +
+
+ geom_point(data = d, aes(x = weight, y = height), alpha = 0.4, shape = 1, col = rangi2) +
+  geom_function(fun = function(x) {a_map + b_map * log(x)})
+```
+
+
+## 4H4
+
+
+
 
